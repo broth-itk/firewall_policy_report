@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 from getpass import getpass
@@ -11,7 +11,7 @@ from rich.theme import Theme
 from rich.progress import track
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import Font, colors, PatternFill, Alignment
+from openpyxl.styles import DEFAULT_FONT, Font, colors, PatternFill, Alignment
 from openpyxl.styles.differential import DifferentialStyle
 from openpyxl.formatting.rule import Rule
 
@@ -22,9 +22,10 @@ directory = os.path.dirname(__file__)
 report_name = 'ACLreport_' + date.today().strftime('%Y%m%d')
 input_file = 'input.yml'
 # Header names and columns widths for the XL sheet
-header = {'Policy/ACL Name':25, 'Line Number':17, 'Access':18, 'Protocol':12, 'Source Address':23, 'Source Service':14, 'Destination Address':23,
-          'Destination Service':26, 'Hit Count':14, 'Date Last Hit':17, 'Time Last Hit':17, 'State':10}
+header = {'Policy/ACL Name':35, 'Line Number':15, 'Access':15, 'Protocol':30, 'Source Address':40, 'Source Service':15, 'Destination Address':40,
+          'Destination Service':26, 'Hit Count':15, 'Date Last Hit':20, 'Time Last Hit':20, 'State':10}
 
+DEFAULT_FONT.name = 'Frutiger LT 45 Light'
 
 ################################## Multi-Use functions ##################################
 # INPUT_VAL: Validates the input file has the correct dictionaires and format for each FW type (ASA or CKP)
@@ -193,14 +194,15 @@ def create_xls(args, acl):
 
     # 5a. Create a workbook per device
     wb = Workbook()
+
     for dvc, dvc_acl in acl.items():
         ws1 = wb.create_sheet(title=dvc)
-
+        
         # 5b. Add the headers, set font, colour and column width (from header dictionary)
         for col, head in zip(range(1,len(header) + 1), header.items()):
             ws1['{}1'.format(get_column_letter(col))] = head[0]      # get_column_letter converts number to letter
             ws1['{}1'.format(get_column_letter(col))].fill = PatternFill(bgColor=colors.Color("00DCDCDC"))
-            ws1['{}1'.format(get_column_letter(col))].font = Font(bold=True, size=14)
+            ws1['{}1'.format(get_column_letter(col))].font = Font(name=DEFAULT_FONT.name, bold=True, size=14)
             ws1.column_dimensions[get_column_letter(col)].width = head[1]
         # 5c. Add the ACE entries. The columns holding numbers are changed to integers
         for ace in dvc_acl:
@@ -216,27 +218,31 @@ def create_xls(args, acl):
         # 5e. Add a key at start with info on the colourised rows for ACEs with frequent hit-cnts
         ws1.insert_rows(1)
         ws1.insert_rows(2)
-        keys = {'A1': 'Key:', 'B1':'Hit in last 1 day', 'E1':'Hit in last 7 days', 'G1':'Hit in last 30 days', 'I1':'Inactive'}
-        colour  = {'B1':'E6B0AA', 'E1':'A9CCE3', 'G1':'F5CBA7', 'I1':'D4EFDF'}
+        keys = {'A1': 'Color code:', 'B1':'Hit in last 1 day', 'E1':'Hit in last 7 days', 'G1':'Hit in last 30 days', 'I1':'Inactive'}
+        # colour  = {'B1':'E6B0AA', 'E1':'A9CCE3', 'G1':'F5CBA7', 'I1':'D4EFDF'}
+        colour  = {'B1':'00EA4E', 'E1':'00D146', 'G1':'02A93A', 'I1':'FA0C65'}
 
         for cell, val in keys.items():
             ws1[cell] = val
-        ws1['A1'].font = Font(bold=True)
+        ws1['A1'].font = Font(name=DEFAULT_FONT.name, bold=True)
         for cell, col in colour.items():
             ws1[cell].fill = PatternFill(start_color=col, end_color=col, fill_type='solid')
 
-        ws1.freeze_panes = ws1['A4']                    # Freezes the top row (A1) so remains when scrolling
-        ws1.auto_filter.ref = 'A3:L4'                   # Adds dropdown to headers to the headers
+        ws1.freeze_panes = ws1['A4']    # Freezes the top row (A1) so remains when scrolling
+        ws1.auto_filter.ref = 'A3:L4'   # Adds dropdown to headers to the headers
 
         # 5f. Colours used for columns dependant on the last hit data (J column). Formula is a standard XL formula
-        style_grn = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("00D4EFDF")))
-        rule_inactive = Rule(type="expression",formula=['=$L1="inactive"'], dxf=style_grn)
-        style_red = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("00E6B0AA")))
-        rule_1day = Rule(type="expression",formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=1)"], dxf=style_red)
-        style_blu = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("00A9CCE3")))
-        rule_7day = Rule(type="expression", formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=7)"], dxf=style_blu)
-        style_org = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("00F5CBA7")))
-        rule_30day = Rule(type="expression", formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=30)"], dxf=style_org)
+        style1 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("FA0C65")))
+        rule_inactive = Rule(type="expression",formula=['=$L1="inactive"'], dxf=style1)
+        
+        style2 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("00EA4E")))
+        rule_1day = Rule(type="expression",formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=1)"], dxf=style2)
+        
+        style3 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("00D146")))
+        rule_7day = Rule(type="expression", formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=7)"], dxf=style3)
+        
+        style4 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("02A93A")))
+        rule_30day = Rule(type="expression", formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=30)"], dxf=style4)
 
         # 5g. Apply the rules to workbook and save it
         for rule in [rule_inactive, rule_1day, rule_7day, rule_30day]:

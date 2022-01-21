@@ -1,6 +1,7 @@
-#!/usr/bin/env python
-from netmiko import Netmiko
+#!/usr/bin/env python3
+
 import re
+from netmiko import Netmiko
 from ipaddress import IPv4Network
 from datetime import datetime
 from copy import deepcopy
@@ -15,30 +16,42 @@ def login(fw, user, pword):
         return (True, net_conn)
     except Exception as e:
         return (False, "\u26A0\uFE0F  [yellow]WARNING[/yellow] - '{}'".format(e).splitlines()[0])
+
 # Used to close all sessions
 def logoff(fw, sid):
     sid.disconnect()
 
 
 ################################## 2. Gather ACLs from ASAs ##################################
-def get_acls(fw, sid):
+def get_acls(fw, sid, ignore_other = 1):
     asa_all_acls, acl_brief, acl_brief_temp = ([] for i in range(3))
 
     # 2a. Gets the name of all ACLs to be used in the show acl name brief cmd
     asa_acl = sid.send_command('show run access-group')
-    ra_vpn_acl = sid.send_command('show run | in split-tunnel-network-list')
-    sts_vpn_acl = sid.send_command('show run | in match address')
     for ace in asa_acl.splitlines():
         asa_all_acls.append(ace.split(' ')[1])
-    for ace in ra_vpn_acl.splitlines():
-        asa_all_acls.append(ace.split('value ')[1])
-    for ace in sts_vpn_acl.splitlines():
-        asa_all_acls.append(ace.split('address ')[1])
+
+    if not ignore_other:
+        ra_vpn_acl = sid.send_command('show run | in split-tunnel-network-list')
+        sts_vpn_acl = sid.send_command('show run | in match address')
+        for ace in ra_vpn_acl.splitlines():
+            asa_all_acls.append(ace.split('value ')[1])
+        for ace in sts_vpn_acl.splitlines():
+            asa_all_acls.append(ace.split('address ')[1])
 
     # 2b. Gathers show ACL (as a string) and show ACL brief (as a list) output for all the ACLs
     for ace in set(asa_all_acls):
         acl_brief_temp.append(sid.send_command('show access-list {} brief'.format(ace)))
-    acl_expanded = sid.send_command('show access-list | ex elements|cached|alert-interval|remark')
+    acl_expanded_temp = sid.send_command('show access-list | ex elements|cached|alert-interval|remark')
+
+    if ignore_other:
+        # accept only firewall ACLs, ignore service policy or crypto ACLs
+        slist = acl_expanded_temp.splitlines()
+        acl_expanded = ""
+        for ace in slist:
+            if '_access_out ' in ace or '_access_in ' in ace:
+                acl_expanded += ace + '\n'
+
 
     # 2c. Creates new ACL brief list of all lines that have a timestamp (matching 8 characters, space, 8 characters)
     for item in acl_brief_temp:
