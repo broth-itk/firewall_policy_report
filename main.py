@@ -22,8 +22,8 @@ directory = os.path.dirname(__file__)
 report_name = 'ACLreport_' + date.today().strftime('%Y%m%d')
 input_file = 'input.yml'
 # Header names and columns widths for the XL sheet
-header = {'Policy/ACL Name':35, 'Line Number':15, 'Access':15, 'Protocol':30, 'Source Address':40, 'Source Service':15, 'Destination Address':40,
-          'Destination Service':26, 'Hit Count':15, 'Date Last Hit':20, 'Time Last Hit':20, 'State':10}
+header = {'Policy/ACL Name':35, 'Line Number':30, 'Access':15, 'Protocol':30, 'Source Address':40, 'Source Service':30, 'Destination Address':40,
+          'Destination Service':26, 'Hit Count':15, 'Date Last Hit':20, 'Time Last Hit':20, 'State':10, 'Comment':100}
 
 DEFAULT_FONT.name = 'Frutiger LT 45 Light'
 
@@ -201,11 +201,19 @@ def create_xls(args, acl):
         # 5b. Add the headers, set font, colour and column width (from header dictionary)
         for col, head in zip(range(1,len(header) + 1), header.items()):
             ws1['{}1'.format(get_column_letter(col))] = head[0]      # get_column_letter converts number to letter
-            ws1['{}1'.format(get_column_letter(col))].fill = PatternFill(bgColor=colors.Color("00DCDCDC"))
+            ws1['{}1'.format(get_column_letter(col))].fill = PatternFill(bgColor=colors.Color("DCDCDC"))
             ws1['{}1'.format(get_column_letter(col))].font = Font(name=DEFAULT_FONT.name, bold=True, size=14)
             ws1.column_dimensions[get_column_letter(col)].width = head[1]
         # 5c. Add the ACE entries. The columns holding numbers are changed to integers
+        prev = "";
         for ace in dvc_acl:
+            # insert empty rows for better visibility
+            if ace[0] != prev:
+                if prev:
+                    ws1.append([])
+                    ws1.append([])
+                prev = ace[0]
+
             ace[1] = int(ace[1])
             ace[8] = int(ace[8])
             if ace[7].isdigit():
@@ -220,7 +228,7 @@ def create_xls(args, acl):
         ws1.insert_rows(2)
         keys = {'A1': 'Color code:', 'B1':'Hit in last 1 day', 'E1':'Hit in last 7 days', 'G1':'Hit in last 30 days', 'I1':'Inactive'}
         # colour  = {'B1':'E6B0AA', 'E1':'A9CCE3', 'G1':'F5CBA7', 'I1':'D4EFDF'}
-        colour  = {'B1':'00EA4E', 'E1':'00D146', 'G1':'02A93A', 'I1':'FA0C65'}
+        colour  = {'B1':'FFE6CC', 'E1':'CCFFFF', 'G1':'CCD9FF', 'I1':'FF3838'}
 
         for cell, val in keys.items():
             ws1[cell] = val
@@ -232,16 +240,16 @@ def create_xls(args, acl):
         ws1.auto_filter.ref = 'A3:L4'   # Adds dropdown to headers to the headers
 
         # 5f. Colours used for columns dependant on the last hit data (J column). Formula is a standard XL formula
-        style1 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("FA0C65")))
+        style1 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("FF3838")))
         rule_inactive = Rule(type="expression",formula=['=$L1="inactive"'], dxf=style1)
         
-        style2 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("00EA4E")))
+        style2 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("FFE6CC")))
         rule_1day = Rule(type="expression",formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=1)"], dxf=style2)
         
-        style3 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("00D146")))
+        style3 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("CCFFFF")))
         rule_7day = Rule(type="expression", formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=7)"], dxf=style3)
         
-        style4 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("02A93A")))
+        style4 = DifferentialStyle(fill=PatternFill(bgColor=colors.Color("CCD9FF")))
         rule_30day = Rule(type="expression", formula=["=AND(TODAY()-$J1>=0,TODAY()-$J1<=30)"], dxf=style4)
 
         # 5g. Apply the rules to workbook and save it
@@ -282,11 +290,11 @@ def main():
             import_fw[fw_type].format_acl(fw, acl_brief, acl_expanded)
             acl.update(import_fw[fw_type].format_acl(fw, acl_brief, acl_expanded))
 
-    # 5. Build the Excel worksheet, a separate sheet per device
-    create_xls(args, acl)
-
-    #6. Logoff sessions form all firewalls
+    # 5. Logoff sessions form all firewalls
     logoff(import_fw, fw_sid)
+
+    # 6. Build the Excel worksheet, a separate sheet per device
+    create_xls(args, acl)
 
 if __name__ == '__main__':
     main()
